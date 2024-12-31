@@ -354,7 +354,7 @@ const player2Config = {
   }
 };
 function preload() {
-  bgImage = loadImage('BACKG.jpg');
+  bgImage = loadImage('BACKG.png');
   
   p1Sprites = {
     run: loadImage('alrun.png'),
