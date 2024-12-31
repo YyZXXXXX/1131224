@@ -354,7 +354,7 @@ const player2Config = {
   }
 };
 function preload() {
-  bgImage = loadImage('HaloZeroBGs.png');
+  bgImage = loadImage('BACKG.jpg');
   
   p1Sprites = {
     run: loadImage('alrun.png'),
