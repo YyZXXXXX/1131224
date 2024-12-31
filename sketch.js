@@ -36,58 +36,8 @@ class Fighter {
     this.hitEffectTimer = 0;
   }
 
-  drawHP() {
-    push();
-    const hpBarWidth = 300;
-    const hpBarHeight = 30;
-    const x = this.isPlayer1 ? 50 : windowWidth - 350;
-    const y = 30;
-    
-    // 血條外框陰影
-    fill(0, 0, 0, 50);
-    rect(x + 4, y + 4, hpBarWidth, hpBarHeight, 15);
-    
-    // 血條外框
-    stroke(255);
-    strokeWeight(3);
-    fill(40, 40, 40, 200);
-    rect(x, y, hpBarWidth, hpBarHeight, 15);
-    
-    // 血條顏色和漸層
-    noStroke();
-    const hpWidth = (this.hp / MAX_HP) * (hpBarWidth - 6);
-    const hpColor = this.hp > 70 ? color(100, 255, 100) :
-                    this.hp > 30 ? color(255, 200, 0) :
-                    color(255, 50, 50);
-    
-    const gradient = drawingContext.createLinearGradient(x, y, x, y + hpBarHeight);
-    gradient.addColorStop(0, color(255, 255, 255, 150));
-    gradient.addColorStop(0.5, hpColor);
-    gradient.addColorStop(1, color(0, 0, 0, 100));
-    
-    drawingContext.fillStyle = gradient;
-    rect(x + 3, y + 3, hpWidth, hpBarHeight - 6, 12);
-    
-    // HP數值
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textStyle(BOLD);
-    textSize(18);
-    text(this.hp + '%', x + hpBarWidth/2, y + hpBarHeight/2);
-    
-    // 玩家標籤
-    textAlign(this.isPlayer1 ? LEFT : RIGHT);
-    textSize(24);
-    const playerColor = this.isPlayer1 ? color(255, 100, 100) : color(100, 100, 255);
-    fill(playerColor);
-    stroke(255);
-    strokeWeight(2);
-    text(this.isPlayer1 ? 'PLAYER 1' : 'PLAYER 2', 
-         this.isPlayer1 ? x : x + hpBarWidth, y - 30);
-    pop();
-  }
-    update() {
-    // 重力和跳躍更新
+  update() {
+    // 更新跳躍和重力
     if (this.isJumping) {
       this.velocityY += GRAVITY;
       this.y += this.velocityY;
@@ -102,13 +52,13 @@ class Fighter {
       }
     }
 
-    // 移動更新
+    // 更新移動
     if (this.moveLeft) {
       const nextX = this.x - MOVE_SPEED;
       if (nextX > SCREEN_PADDING) {
         this.x = nextX;
       }
-      this.direction = this.isPlayer1 ? -1 : 1;
+      this.direction = this.isPlayer1 ? 1 : -1;
       if (!this.isJumping) this.currentAnimation = 'run';
     }
     if (this.moveRight) {
@@ -116,33 +66,14 @@ class Fighter {
       if (nextX < windowWidth - SCREEN_PADDING) {
         this.x = nextX;
       }
-      this.direction = this.isPlayer1 ? 1 : -1;
+      this.direction = this.isPlayer1 ? -1 : 1;
       if (!this.isJumping) this.currentAnimation = 'run';
     }
 
-    // 投射物更新
-    for (let i = this.projectiles.length - 1; i >= 0; i--) {
-      const projectile = this.projectiles[i];
-      projectile.update();
-      
-      const opponent = this.isPlayer1 ? player2 : player1;
-      if (projectile.checkHit(opponent)) {
-        opponent.takeDamage(PROJECTILE_DAMAGE);
-        projectile.active = false;
-        
-        // 擊中後的擊退效果
-        const knockbackForce = 10;
-        opponent.x += knockbackForce * projectile.direction;
-        opponent.x = Math.max(SCREEN_PADDING, 
-                            Math.min(windowWidth - SCREEN_PADDING, opponent.x));
-      }
-      
-      if (!projectile.active) {
-        this.projectiles.splice(i, 1);
-      }
-    }
-
-    // 受傷閃爍效果更新
+    // 更新投射物
+    this.updateProjectiles();
+    
+    // 更新受傷效果
     if (this.isHit) {
       this.hitEffectTimer++;
       if (this.hitEffectTimer > 10) {
@@ -151,10 +82,33 @@ class Fighter {
       }
     }
   }
-    takeDamage(damage) {
+    updateProjectiles() {
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const projectile = this.projectiles[i];
+      projectile.update();
+      
+      const opponent = this.isPlayer1 ? player2 : player1;
+      if (projectile.checkHit(opponent)) {
+        opponent.takeDamage(PROJECTILE_DAMAGE);
+        projectile.isExploding = true;
+        
+        // 擊中效果
+        const knockbackForce = 10;
+        opponent.x += knockbackForce * projectile.direction;
+        opponent.x = Math.max(SCREEN_PADDING, Math.min(windowWidth - SCREEN_PADDING, opponent.x));
+      }
+      
+      if (!projectile.active) {
+        this.projectiles.splice(i, 1);
+      }
+    }
+  }
+
+  takeDamage(damage) {
     this.hp = Math.max(0, this.hp - damage);
     this.isHit = true;
-    
+    this.hitEffectTimer = 0;
+
     if (this.hp <= 0) {
       this.handleDeath();
     }
@@ -166,10 +120,9 @@ class Fighter {
       this.isAttacking = true;
       this.frame = 0;
       
-      // 發射投射物
-      const projectileX = this.x + (this.direction === 1 ? 50 : -50);
+      const projectileX = this.x + (this.direction === 1 ? -50 : 50);
       const projectileY = this.y - 50;
-      this.projectiles.push(new Projectile(projectileX, projectileY, this.direction, this.isPlayer1));
+      this.projectiles.push(new Projectile(projectileX, projectileY, -this.direction, this.isPlayer1));
       
       setTimeout(() => {
         this.isAttacking = false;
@@ -180,12 +133,101 @@ class Fighter {
     }
   }
 
-  ice() {
+  drawHP() {
+    push();
+    const barWidth = 300;
+    const barHeight = 30;
+    const x = this.isPlayer1 ? 50 : width - barWidth - 50;
+    const y = 30;
+
+    // 外框陰影
+    fill(0, 0, 0, 50);
+    rect(x + 3, y + 3, barWidth, barHeight, 15);
+
+    // 外框
+    stroke(255);
+    strokeWeight(2);
+    fill(40, 40, 40);
+    rect(x, y, barWidth, barHeight, 15);
+
+    // HP條
+    noStroke();
+    const hpWidth = map(this.hp, 0, MAX_HP, 0, barWidth - 4);
+    const hpColor = lerpColor(
+      color(255, 0, 0),
+      color(0, 255, 0),
+      this.hp / MAX_HP
+    );
+    
+    fill(hpColor);
+    rect(x + 2, y + 2, hpWidth, barHeight - 4, 13);
+
+    // 光澤效果
+    fill(255, 255, 255, 30);
+    rect(x + 2, y + 2, hpWidth, (barHeight - 4)/2, 13, 13, 0, 0);
+
+    // HP數值
+    fill(255);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(16);
+    text(`${this.hp}%`, x + barWidth/2, y + barHeight/2);
+
+    // 玩家標籤
+    textAlign(this.isPlayer1 ? LEFT : RIGHT);
+    textSize(20);
+    fill(this.isPlayer1 ? color(255, 100, 100) : color(100, 100, 255));
+    text(this.isPlayer1 ? 'PLAYER 1' : 'PLAYER 2', 
+         this.isPlayer1 ? x : x + barWidth, y - 25);
+    pop();
+  }
+    ice() {
     if (!this.isJumping) {
       this.velocityY = JUMP_FORCE;
       this.isJumping = true;
       this.currentAnimation = 'ice';
     }
+  }
+
+  animate() {
+    const currentConfig = this.config[this.currentAnimation];
+    this.frameCounter++;
+    
+    if (this.frameCounter >= currentConfig.frameDelay) {
+      this.frame = (this.frame + 1) % currentConfig.frames;
+      this.frameCounter = 0;
+    }
+
+    push();
+    translate(this.x, this.y);
+    
+    // 受傷閃爍效果
+    if (this.isHit) {
+      tint(255, 0, 0, 200);
+    }
+    
+    scale(this.direction * this.scale, this.scale);
+    
+    const frameWidth = this.sprites[this.currentAnimation].width / currentConfig.frames;
+    const offsetY = currentConfig.offsetY || 0;
+    
+    image(
+      this.sprites[this.currentAnimation],
+      -currentConfig.width/2,
+      -currentConfig.height + offsetY,
+      currentConfig.width,
+      currentConfig.height,
+      frameWidth * this.frame,
+      0,
+      frameWidth,
+      this.sprites[this.currentAnimation].height
+    );
+    pop();
+
+    // 繪製投射物
+    this.projectiles.forEach(projectile => {
+      projectile.draw();
+    });
   }
 
   handleDeath() {
@@ -197,19 +239,17 @@ class Fighter {
     push();
     // 半透明黑色背景
     fill(0, 0, 0, 150);
-    rect(0, 0, windowWidth, windowHeight);
+    rect(0, 0, width, height);
     
     // 獲勝文字
     textAlign(CENTER, CENTER);
     textSize(64);
     fill(255);
-    stroke(0);
-    strokeWeight(4);
-    text(winner + " Wins!", windowWidth/2, windowHeight/2);
+    text(winner + " Wins!", width/2, height/2);
     
     // 重新開始提示
     textSize(32);
-    text("Press R to restart", windowWidth/2, windowHeight/2 + 50);
+    text("Press R to restart", width/2, height/2 + 50);
     pop();
     
     noLoop();
@@ -222,78 +262,65 @@ class Projectile {
     this.y = y;
     this.direction = direction;
     this.width = 40;
-    this.height = 30;
+    this.height = 40;
     this.isPlayer1 = isPlayer1;
     this.active = true;
-    this.particles = [];
+    this.isExploding = false;
+    this.explosionFrame = 0;
+    this.explosionSize = 80;
   }
 
   update() {
-    this.x += PROJECTILE_SPEED * this.direction;
-    if (this.x < 0 || this.x > windowWidth) {
-      this.active = false;
-    }
-  }
-
-  draw() {
-    push();
-    // 光暈效果
-    for(let i = 4; i > 0; i--) {
-      const alpha = 100 - i * 20;
-      fill(this.isPlayer1 ? color(255, 0, 0, alpha) : color(0, 0, 255, alpha));
-      noStroke();
-      ellipse(this.x, this.y, this.width + i*5, this.height + i*5);
-    }
-    
-    // 主要投射物
-    fill(this.isPlayer1 ? color(255, 50, 50) : color(50, 50, 255));
-    ellipse(this.x, this.y, this.width, this.height);
-    
-    // 內部光暈
-    fill(255, 200);
-    ellipse(this.x - this.width/4, this.y - this.height/4, this.width/3, this.height/3);
-    pop();
-    
-    this.updateParticles();
-  }
-    updateParticles() {
-    // 添加新粒子
-    if (this.active) {
-      for(let i = 0; i < 2; i++) {
-        this.particles.push({
-          x: this.x,
-          y: this.y,
-          vx: random(-2, 2),
-          vy: random(-2, 2),
-          life: 1
-        });
+    if (!this.isExploding) {
+      this.x += PROJECTILE_SPEED * this.direction;
+      if (this.x < 0 || this.x > width) {
+        this.active = false;
       }
     }
-    
-    // 更新和繪製粒子
-    for(let i = this.particles.length - 1; i >= 0; i--) {
-      let p = this.particles[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.life -= 0.02;
-      
-      if(p.life <= 0) {
-        this.particles.splice(i, 1);
-        continue;
-      }
-      
+  }
+    draw() {
+    if (this.isExploding) {
+      // 爆炸動畫
       push();
+      translate(this.x, this.y);
+      let explosionColor = this.isPlayer1 ? color(255, 100, 0) : color(0, 100, 255);
+      fill(explosionColor);
       noStroke();
-      fill(this.isPlayer1 ? 
-           color(255, 0, 0, p.life * 255) : 
-           color(0, 0, 255, p.life * 255));
-      ellipse(p.x, p.y, 5 * p.life);
+      circle(0, 0, this.explosionSize * (1 - this.explosionFrame/10));
+      
+      // 爆炸粒子效果
+      for (let i = 0; i < 8; i++) {
+        let angle = TWO_PI * i / 8;
+        let x = cos(angle) * this.explosionSize * (1 - this.explosionFrame/10);
+        let y = sin(angle) * this.explosionSize * (1 - this.explosionFrame/10);
+        circle(x, y, 10);
+      }
+      pop();
+      
+      this.explosionFrame++;
+      if (this.explosionFrame > 10) {
+        this.active = false;
+      }
+    } else {
+      // 一般投射物
+      push();
+      translate(this.x, this.y);
+      rotate(frameCount * 0.2);
+      fill(this.isPlayer1 ? color(255, 100, 0, 200) : color(0, 100, 255, 200));
+      noStroke();
+      beginShape();
+      for (let i = 0; i < 8; i++) {
+        let angle = TWO_PI * i / 8;
+        let r = i % 2 === 0 ? this.width : this.width/2;
+        vertex(cos(angle) * r, sin(angle) * r);
+      }
+      endShape(CLOSE);
       pop();
     }
   }
 
   checkHit(opponent) {
-    if (!this.active) return false;
+    if (!this.active || this.isExploding) return false;
     
     const opponentBox = {
       x: opponent.x - (opponent.config[opponent.currentAnimation].width * opponent.scale) / 2,
@@ -308,7 +335,6 @@ class Projectile {
            this.y - this.height/2 < opponentBox.y + opponentBox.height;
   }
 }
-
 const player1Config = {
   run: {
     frames: 6,
@@ -353,6 +379,7 @@ const player2Config = {
     height: 49
   }
 };
+
 function preload() {
   bgImage = loadImage('BACKG.png');
   
@@ -397,7 +424,7 @@ function drawTitle() {
   textStyle(BOLD);
   textSize(32);
   
-  // 標題陰影效果
+  // 文字陰影效果
   for(let i = 10; i > 0; i--) {
     fill(255, 255, 255, i * 2);
     text(title, windowWidth/2, 10 + i/2);
@@ -488,7 +515,9 @@ function keyPressed() {
       player2.punch();
       break;
     case 82: // R
-      if (!isLooping()) resetGame();
+      if (gameState.gameOver) {
+        resetGame();
+      }
       break;
   }
 }
@@ -516,10 +545,9 @@ function keyReleased() {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  const newGroundY = window.innerHeight / 1.25;
-  player1.y = player1.y - GROUND_Y + newGroundY;
-  player2.y = player2.y - GROUND_Y + newGroundY;
-  GROUND_Y = newGroundY;
+  GROUND_Y = window.innerHeight / 1.25;
+  player1.y = GROUND_Y;
+  player2.y = GROUND_Y;
 }
 
 function resetGame() {
@@ -527,44 +555,3 @@ function resetGame() {
   player2 = new Fighter(windowWidth * 0.7, GROUND_Y, p2Sprites, player2Config, false);
   loop();
 }
-
-  animate() {
-    const currentConfig = this.config[this.currentAnimation];
-    this.frameCounter++;
-    
-    if (this.frameCounter >= currentConfig.frameDelay) {
-      this.frame = (this.frame + 1) % currentConfig.frames;
-      this.frameCounter = 0;
-    }
-
-    push();
-    translate(this.x, this.y);
-    
-    // 受傷閃爍效果
-    if (this.isHit) {
-      tint(255, 0, 0, 200);
-    }
-    
-    scale(this.direction * this.scale, this.scale);
-    
-    const frameWidth = this.sprites[this.currentAnimation].width / currentConfig.frames;
-    const offsetY = currentConfig.offsetY || 0;
-    
-    image(
-      this.sprites[this.currentAnimation],
-      -currentConfig.width/2,
-      -currentConfig.height + offsetY,
-      currentConfig.width,
-      currentConfig.height,
-      frameWidth * this.frame,
-      0,
-      frameWidth,
-      this.sprites[this.currentAnimation].height
-    );
-    pop();
-
-    // 繪製所有投射物
-    this.projectiles.forEach(projectile => {
-      projectile.draw();
-    });
-  }
